@@ -1,0 +1,117 @@
+---
+title: "discriminantPCA"
+format: html
+editor: visual
+---
+```{r}
+# set upz
+
+# libs
+library(adegenet)
+library(tidyverse)
+library(ggplot2)
+library(readr)
+
+# import
+abacura_het_coords <- read_csv("/Users/classes/bio355b/CURE_projects/tbontb/data_processed/abacura_het_coords.csv")
+ltri_het_coords <- read_csv("/Users/classes/bio355b/CURE_projects/tbontb/data_processed/ltri_het_coords.csv")
+sdekayi_het_coords <- read_csv("/Users/classes/bio355b/CURE_projects/tbontb/data_processed/sdekayi_het_coords.csv")
+```
+
+### get data (thanks bea)
+```{r}
+#data
+path <- "/Users/classes/bio355b/CURE_projects/tbontb/data_processed"
+pops <- c("abacura_only",
+          "Acontortrix_p123_v2_25miss",
+          "Dpunctatus_p123_v3_25missEAST",
+          "erytro",
+          "Lgetula_p123_v4_25miss",
+          "Mflagellum_p123_v3_25missEast",
+          "Pguttatus_p123_v2_25miss",
+          "Sdekayi_p123_v4_25miss",
+          "Milks_filtered_snps_taxa")
+
+# sdekayi pca extract
+Sdekayi_pca <- read_table(file.path(path, "Sdekayi_p123_v4_25miss_pca.eigenvec"), col_names = FALSE)
+colnames(Sdekayi_pca)[1:2] <- c("FID","INDV")
+colnames(Sdekayi_pca)[3:ncol(Sdekayi_pca)] <- paste0("PC", 1:(ncol(Sdekayi_pca)-2))
+Sdekayi_pca <- left_join(Sdekayi_pca, sdekayi_het_coords, by = "INDV")
+
+# abacura pca extract
+abacura_pca <- read_table(file.path(path, "abacura_only_pca.eigenvec"), col_names = FALSE)
+colnames(abacura_pca)[1:2] <- c("FID","INDV")
+colnames(abacura_pca)[3:ncol(abacura_pca)] <- paste0("PC", 1:(ncol(abacura_pca)-2))
+abacura_pca <- left_join(abacura_pca, abacura_het_coords, by = "INDV")
+
+# ltri pca extract
+ltri_pca <- read_table(file.path(path, "Milks_filtered_snps_taxa_pca.eigenvec"), col_names = FALSE)
+colnames(ltri_pca)[1:2] <- c("FID","INDV")
+colnames(ltri_pca)[3:ncol(ltri_pca)] <- paste0("PC", 1:(ncol(ltri_pca)-2))
+ltri_pca <- ltri_pca |> separate(INDV, c("genus", "species", "INDV"), "_")
+ltri_pca <- left_join(ltri_pca, ltri_het_coords, by = "INDV")
+
+```
+
+
+# DAPC
+```{r}
+# abacura
+pc_matrix <- as.matrix(abacura_pca[, paste0("PC", 1:20)])
+rownames(pc_matrix) <- abacura_pca$INDV # pca matrix
+clusters_abacura <- find.clusters(pc_matrix, n.pca = 10, choose.n.clust = FALSE, criterion = "goodfit") # find clusters
+dapc_result <- dapc(pc_matrix_a, grp = clusters_abacura$grp, n.pca = 3, n.da = 2)
+scatter(dapc_result) # graph clusters
+```
+
+
+```{r}
+myCol <- c("darkblue",
+           "purple",
+           "green",
+           "orange",
+           "red",
+           "blue", 
+           "yellow",
+           "lightblue",
+           "darkgreen",
+           "brown",
+           "grey",
+           "pink")
+# ltri
+pc_matrix_l <- as.matrix(ltri_pca[, paste0("PC", 1:20)])
+rownames(pc_matrix_l) <-ltri_pca$INDV # pca matrix
+
+clusters_l <- find.clusters(pc_matrix_l, n.pca = 10, choose.n.clust = TRUE, criterion = "goodfit") # find clusters
+# choose 12 - so we can get colors to match (previously found by find.clusters)
+# dapc_result_l <- dapc(pc_matrix_l, grp = clusters_l$grp, n.pca = 3, n.da = 2, col=myCol)
+# scatter(dapc_result_l) # graph clusters
+
+scatter(dapc_result_l, posi.da="bottomright", bg="white", pch=17:22, cstar=0, col=myCol)
+```
+
+```{r}
+#sdekayi
+pc_matrix_sd <- as.matrix(Sdekayi_pca[, paste0("PC", 1:20)])
+rownames(pc_matrix_sd) <-Sdekayi_pca$INDV # pca matrix
+
+clusters_sd <- find.clusters(pc_matrix_sd, n.pca = 10, choose.n.clust = FALSE, criterion = "goodfit") # find clusters
+dapc_result_sd <- dapc(pc_matrix_sd, grp = clusters_sd$grp, n.pca = 3, n.da = 2)
+scatter(dapc_result_sd) # graph clusters
+```
+```{r}
+l_result <-dapc_result_l[["grp"]]
+
+# Source - https://stackoverflow.com/a/64465951
+# Posted by Duck, modified by community. See post 'Timeline' for change history
+# Retrieved 2026-05-07, License - CC BY-SA 4.0
+
+ldf <- data.frame(
+  ID = names(l_result),
+  Value = as.factor(l_result),
+  stringsAsFactors = FALSE
+)
+
+```
+
+

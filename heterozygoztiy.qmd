@@ -1,0 +1,341 @@
+---
+title: "heterozygoztiy"
+format: html
+---
+
+```{r}
+#load necessary packages
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(broom)
+library(plotly)
+library(reshape2)
+library(tidyr)
+```
+
+```{r}
+#load data
+out_path <- "/Users/classes/bio355b/CURE_projects/tbontb/data_processed"
+data_path <- "/Users/classes/bio355b/CURE_projects/tbontb/snake_data_raw"
+
+all_coords_requested <- read_csv(file.path(data_path, "all_coords_requested.csv"))
+abacura_het <- read.table(file.path(out_path, "abacura_only.het"), header = TRUE)
+sdekayi_het <- read.table(file.path(out_path, "Sdekayi.het"), header = TRUE)
+ltri_het <- read.table(file.path(out_path, "ltriangulum.het"), header = TRUE)
+```
+
+# Abacura Only
+```{r}
+abacura_het$O.HET. <- abacura_het$N_SITES - abacura_het$O.HOM.
+
+abacura_het$E.HET. <- abacura_het$N_SITES - abacura_het$E.HOM.
+
+abacura_het$prop_e_het <- abacura_het$E.HET. / abacura_het$N_SITES 
+
+abacura_het$prop_o_het <- abacura_het$O.HET. / abacura_het$N_SITES 
+
+all_coords_requested$INDV <- all_coords_requested$number
+```
+
+```{r}
+# just abacura_het
+
+abacura_het_coords <- abacura_het |>  left_join(all_coords_requested, by = join_by(INDV))
+```
+
+```{r}
+lon_model <- lm(prop_o_het ~ lon, data = abacura_het_coords)
+summary(lon_model)
+```
+
+```{r}
+ggplot(data = abacura_het_coords,
+       mapping = aes(x=lon, y=prop_o_het)
+       ) +
+  geom_point() +
+  geom_smooth(method = lm, formula = y~x)  + 
+  labs(x = "Longitude",
+       y = "Proportion of Observed Heterozyozity",
+       title = "Figure A1. F. abacura. Heterozyozity given Longitude")
+```
+
+
+```{r}
+lat_model <- lm(prop_o_het ~ lat, data = abacura_het_coords)
+summary(lat_model)
+```
+
+```{r}
+ggplot(data = abacura_het_coords,
+       mapping = aes(x=lat, y=prop_o_het)
+       ) +
+  geom_point() +
+  geom_smooth(method = lm,  se = TRUE, formula = y~x)  + 
+  labs(x = "Latitude",
+       y = "Proportion of Observed Heterozyozity",
+       title = "Figure A2. F. abacura. Heterozyozity given Latitude") 
+
+```
+
+```{r}
+a_lat_lon_model <- lm(prop_o_het ~ lat + lon, data = abacura_het_coords)
+summary(a_lat_lon_model)
+```
+
+```{r}
+confint(a_lat_lon_model)
+```
+
+```{r}
+tidy_table <- tidy(a_lat_lon_model)
+```
+
+```{r}
+mean<-mean(abacura_het_coords$prop_o_het)
+
+sd <- 1/143*(sum((mean-abacura_het_coords$prop_o_het)^2))
+
+qnorm(0.025, mean, sd)
+qnorm(0.975, mean, sd)
+```
+
+
+```{r}
+# initial scatter plot
+a_scatter_fig <- 
+  plot_ly(data = abacura_het_coords,
+        x = ~ lon,
+        y = ~ lat,
+        z = ~ prop_o_het,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 2)
+        ) 
+
+# graph resolution
+graph_reso <- 0.5
+
+# axis for both df 
+# plane0 
+axis_x <- seq(min(abacura_het_coords$lon), max(abacura_het_coords$lon), by = graph_reso)
+axis_y <- seq(min(abacura_het_coords$lat), max(abacura_het_coords$lat), by = graph_reso)
+
+# create regression plane
+# create MW planes
+regplane <- expand.grid(lon = axis_x, lat = axis_y, KEEP.OUT.ATTRS = F)
+regplane$pred_prop_o_het <- predict.lm(a_lat_lon_model, newdata = regplane)
+regplane <- acast(regplane, lat ~ lon, value.var = "pred_prop_o_het") #y ~ x
+
+a_scatter_fig <- add_trace(p = a_scatter_fig,
+                       z = regplane,
+                       x = axis_x,
+                       y = axis_y,
+                       type = "surface",
+                       colorscale = list(c(0,1), c("blue", "red")),
+                       showscale = FALSE)
+
+axx <- list(
+  title = "Latitude"
+)
+
+axy <- list(
+  title = "Longitude"
+)
+
+axz <- list(
+  title = "Proportion of Observed Heterozygozity"
+)
+
+a_scatter_fig <- a_scatter_fig  |> layout(scene = list(xaxis=axx,yaxis=axy,zaxis=axz))
+
+a_scatter_fig
+```
+
+# Dekayi Only
+```{r}
+sdekayi_het$O.HET. <- sdekayi_het$N_SITES - sdekayi_het$O.HOM.
+
+sdekayi_het$E.HET. <- sdekayi_het$N_SITES - sdekayi_het$E.HOM.
+
+sdekayi_het$prop_e_het <- sdekayi_het$E.HET. / sdekayi_het$N_SITES 
+
+sdekayi_het$prop_o_het <- sdekayi_het$O.HET. / sdekayi_het$N_SITES 
+
+sdekayi_het_coords <- sdekayi_het |>  left_join(all_coords_requested, by = join_by(INDV))
+```
+
+## Lon
+```{r}
+ggplot(data = sdekayi_het_coords,
+       mapping = aes(x=lon, y=prop_o_het)
+       ) +
+  geom_point() +
+  geom_smooth(method = lm,  se = FALSE, formula = y~x)  + 
+  labs(x = "Longitude",
+       y = "Proportion of Observed Heterozyozity")
+
+d_lon_model <- lm(prop_o_het ~ lon, data = sdekayi_het_coords)
+summary(d_lon_model)
+```
+
+## Lat
+```{r}
+ggplot(data = sdekayi_het_coords,
+       mapping = aes(x=lat, y=prop_o_het)
+       ) +
+  geom_point() +
+  geom_smooth(method = lm, formula = y~x)  + 
+  labs(x = "Latititude",
+       y = "Proportion of Observed Heterozyozity",
+       title = "Figure 4. S. Dekayi. Heterozyozity given Latitude")
+
+d_lat_model <- lm(prop_o_het ~ lat, data = sdekayi_het_coords)
+summary(d_lat_model)
+```
+
+```{r}
+lonlatsd_model <- lm(prop_o_het ~ lon + lat, data = sdekayi_het_coords)
+summary(lonlatsd_model)
+```
+
+```{r}
+tidy_table <- tidy(d_lat_model)
+
+confint(d_lat_model)
+```
+
+```{r}
+mean<-mean(sdekayi_het_coords$prop_o_het)
+
+sd <- 1/143*(sum((mean-sdekayi_het_coords$prop_o_het)^2))
+
+qnorm(0.025, mean, sd)
+qnorm(0.975, mean, sd)
+```
+
+# L Triangulum
+```{r}
+library(tidyr)
+ltri_het <- read.table("/Users/soxwhitin/smith/BIO/335/snake/doi_10_5061_dryad_9cnp5hqv5__v20241125/out/ltriangulum.het", header = TRUE)
+
+ltri_het <- ltri_het |> 
+  separate(INDV, c("genus", "species", "ID"), "_")
+
+all_coords_requested$ID <- all_coords_requested$INDV
+
+ltri_het$O.HET. <- ltri_het$N_SITES - ltri_het$O.HOM.
+
+ltri_het$E.HET. <- ltri_het$N_SITES - ltri_het$E.HOM.
+
+ltri_het$prop_e_het <- ltri_het$E.HET. / ltri_het$N_SITES 
+
+ltri_het$prop_o_het <- ltri_het$O.HET. / ltri_het$N_SITES 
+
+ltri_het_coords <- ltri_het |>  left_join(all_coords_requested, by = join_by(ID))
+
+```
+
+## Lon
+```{r}
+ggplot(data = ltri_het_coords,
+       mapping = aes(x=lon, y=prop_o_het)
+       ) +
+  geom_point() +
+  geom_smooth(method = lm,  se = TRUE, formula = y~x)  + 
+  labs(x = "Longitude",
+       y = "Proportion of Observed Heterozyozity",
+       title = "Figure 5. L. triangulum. Heterozyozity given Longitude")
+
+t_lon_model <- lm(prop_o_het ~ lon, data = ltri_het_coords)
+summary(t_lon_model)
+```
+
+## Lat
+```{r}
+ggplot(data = ltri_het_coords,
+       mapping = aes(x=lat, y=prop_o_het)
+       ) +
+  geom_point() +
+  geom_smooth(method = lm,  se = TRUE, formula = y~x)  + 
+  labs(x = "Latititude",
+       y = "Proportion of Observed Heterozyozity",
+       title = "Figure 6. L. triangulum. Heterozyozity given Latitude")
+
+t_lat_model <- lm(prop_o_het ~ lat, data = ltri_het_coords)
+summary(t_lat_model)
+```
+
+## Lat + Long
+```{r}
+additive_model <- lm(prop_o_het ~ lat + lon, data = ltri_het_coords)
+summary(additive_model)
+```
+
+```{r}
+tidy_table <- tidy(additive_model)
+
+confint(additive_model)
+```
+
+
+```{r}
+# initial scatter plot
+tri_scatter_fig <- 
+  plot_ly(data = ltri_het_coords,
+        x = ~ lon,
+        y = ~ lat,
+        z = ~ prop_o_het,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 2)
+        ) 
+
+# graph resolution
+graph_reso <- 0.5
+
+# axis for both df 
+# plane0 
+axis_x <- seq(min(ltri_het_coords$lon), max(ltri_het_coords$lon), by = graph_reso)
+axis_y <- seq(min(ltri_het_coords$lat), max(ltri_het_coords$lat), by = graph_reso)
+
+# create regression plane
+# create MW planes
+regplane <- expand.grid(lon = axis_x, lat = axis_y, KEEP.OUT.ATTRS = F)
+regplane$pred_prop_o_het <- predict.lm(additive_model, newdata = regplane)
+regplane <- acast(regplane, lat ~ lon, value.var = "pred_prop_o_het") #y ~ x
+
+tri_scatter_fig <- add_trace(p = tri_scatter_fig,
+                       z = regplane,
+                       x = axis_x,
+                       y = axis_y,
+                       type = "surface",
+                       colorscale = list(c(0,1), c("blue", "red")),
+                       showscale = FALSE)
+
+axx <- list(
+  title = "Latitude"
+)
+
+axy <- list(
+  title = "Longitude"
+)
+
+axz <- list(
+  title = "Proportion of Observed Heterozygozity"
+)
+
+tri_scatter_fig <- tri_scatter_fig  |> layout(scene = list(xaxis=axx,yaxis=axy,zaxis=axz))
+
+tri_scatter_fig
+
+```
+
+```{r}
+mean<-mean(ltri_het$prop_o_het)
+
+sd <- 1/143*(sum((mean-ltri_het$prop_o_het)^2))
+
+qnorm(0.025, mean, sd)
+qnorm(0.975, mean, sd)
+```
